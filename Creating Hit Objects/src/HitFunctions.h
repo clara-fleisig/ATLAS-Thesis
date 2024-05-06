@@ -17,10 +17,17 @@ namespace Hit_org{
                 z = my_z;
             }
 
+            // Destructor
+            /*~Hit(){
+                std::cout << "\nDestructor executed" << std::endl;
+            }*/
+
+            //show_Hit method
             void show_Hit()
             {
                 std::cout << "x: " << x << "\t" << "y: " << y << "\t" << "z: " << z << "\t" << std::endl;
             }
+
     };
 
     Hit_org::Hit create_hit_obj(std::int64_t i);
