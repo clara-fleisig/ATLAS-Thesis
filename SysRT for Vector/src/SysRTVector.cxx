@@ -32,12 +32,12 @@ bool CheckValue(ROOT::Internal::TTreeReaderValueBase& value) {
    return true;
 }
 
-std::vector<Hit_org::Hit> create_hit_vec(char const *filename){
+std::vector<Hit_org::Hit> create_hit_vec(char const *filename, char const *treename){
     //open file
-    TFile *File = TFile::Open(filename, "UPDATE");
+    TFile *File = TFile::Open(filename, "READ");
 
     //read branches of interest into vecotrs of type std::vector<float>
-    TTreeReader reader("HitInfo", File);
+    TTreeReader reader(treename, File);
     TTreeReaderValue<std::vector<float>> x(reader, "hit_x");
     TTreeReaderValue<std::vector<float>> y(reader, "hit_y");
     TTreeReaderValue<std::vector<float>> z(reader, "hit_z");
@@ -95,45 +95,37 @@ void create_targ_root(char const *filename){
     std::uniform_real_distribution<float> rho_dist {rho_min, rho_max}; //specify distribution
     std::uniform_real_distribution<float> phi_dist {phi_min, phi_max}; //specify distribution
 
-    //initialise varibles to be used
-    float targ_x; float targ_y; float targ_z;
+    //create vectors with random variables
+    std::vector<float> x_vec; std::vector<float> y_vec; std::vector<float> z_vec;
     float targ_rho; float targ_phi;
-
-    //open root file
-    TFile ResultsFile(filename,"RECREATE");
-
-    //create tree
-    TTree ResultsTree("TargetHits", "Search for target hits with runtime efficiencies");
-    ResultsTree.Branch("targ_x",&targ_x,"targ_x/F");
-    ResultsTree.Branch("targ_y", &targ_y, "targ_y/F");
-    ResultsTree.Branch("targ_z", &targ_z, "targ_z/F");
     for(int i = 0; i < n; i++){
         targ_rho = rho_dist(engine);
         targ_phi = phi_dist(engine);
-        targ_x = targ_rho * std::cos(targ_phi);
-        targ_y = targ_rho * std::sin(targ_phi);
-        targ_z = z_dist(engine);
-        ResultsTree.Fill();
+
+        x_vec.push_back(targ_rho * std::cos(targ_phi));
+        y_vec.push_back(targ_rho * std::sin(targ_phi));
+        z_vec.push_back(z_dist(engine));
     }
 
-    //write to tree to root file and close file
+    //open root file and write vectors in TTree format
+    TFile ResultsFile(filename,"RECREATE");
+    TTree ResultsTree("TargetHits", "Search for target hits with runtime efficiencies");
+    ResultsTree.Branch("hit_x", &x_vec); 
+    ResultsTree.Branch("hit_y", &y_vec); 
+    ResultsTree.Branch("hit_z", &z_vec);
+    ResultsTree.Fill();
     ResultsTree.Write();
     ResultsFile.Close();
 }
 
-int main()
-{
-    //open file with info
-    //TFile *File = TFile::Open("files/ClusterHitSeedRoot.root", "UPDATE");
+int main(){
 
     //Create root file filled with random target hits (only needs to be called once)
-    //create_targ_root("files/VectorRuntime.root");
+    create_targ_root("files/VectorRuntime.root");
     
     //vector objects are allocated on heap
-    std::vector<Hit_org::Hit> hit_vec = create_hit_vec("files/ClusterHitSeedRoot.root");
-
-    //close file
-    //File -> Close();
+    std::vector<Hit_org::Hit> hit_vec = create_hit_vec("files/ClusterHitSeedRoot.root", "HitInfo");
+    std::vector<Hit_org::Hit> targ_vec = create_hit_vec("files/VectorRuntime.root", "TargetHits");
     
     return 0;
 }
