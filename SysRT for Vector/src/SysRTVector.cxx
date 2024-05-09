@@ -1,16 +1,15 @@
+#include "SysRTVector.h"
 #include <vector>
 #include <cstdint>
-#include <TFile.h>
-#include <TTree.h>
-#include <iostream> 
-#include <vector>
-#include "SysRTVector.h"
-#include <TTreeReader.h>
-#include <TTreeReaderValue.h>
-
-//includes exclusively for generating targets
-#include <random> //for random number generation
-#include <cmath> //for trig functions for generating root file
+#include <iostream>
+#include <TFile.h> //for reading and writing files
+#include <TTree.h> //for reading and writing files
+#include <TTreeReader.h> //for reading and writing files
+#include <TTreeReaderValue.h> //for reading and writing files
+#include <limits> //to set to largest possible float, for find_closest_hit()
+#include <random> //for random number generation, includes exclusively for generating targets
+#include <cmath> //for trig functions for generating root file,includes exclusively for generating targets
+#include <chrono> //for runtime evaluations
 
 //define number of target hits to be generated
 #define NUMB_TARGS 1000;
@@ -32,15 +31,35 @@ bool CheckValue(ROOT::Internal::TTreeReaderValueBase& value) {
    return true;
 }
 
-std::vector<Hit_org::Hit> create_hit_vec(char const *filename, char const *treename){
+float calc_dis(Hit_org::Hit hit1, Hit_org::Hit hit2){
+    return std::pow(hit1.x-hit2.x, 2) + std::pow(hit1.y-hit2.y, 2) + std::pow(hit1.z-hit2.z, 2);
+}
+
+Hit_org::Hit find_closest_hit(Hit_org::Hit targ_hit, std::vector<Hit_org::Hit> hit_vec, const int numb_hits){
+    //setup 
+    Hit_org::Hit closest_hit(0, 0, 0);
+    float min_dis = std::numeric_limits<float>::max();
+
+    for(int i = 0; i<numb_hits; i++){
+        auto cur_dis = calc_dis(hit_vec.at(i), targ_hit);
+        if(cur_dis < min_dis){
+            min_dis = cur_dis;
+            closest_hit = hit_vec.at(i);
+        }
+    }
+
+    return closest_hit;
+}
+
+std::vector<Hit_org::Hit> Hit_org::create_hit_vec(char const *filename, char const *treename, char const *xname, char const *yname, char const *zname){
     //open file
     TFile *File = TFile::Open(filename, "READ");
 
     //read branches of interest into vecotrs of type std::vector<float>
     TTreeReader reader(treename, File);
-    TTreeReaderValue<std::vector<float>> x(reader, "hit_x");
-    TTreeReaderValue<std::vector<float>> y(reader, "hit_y");
-    TTreeReaderValue<std::vector<float>> z(reader, "hit_z");
+    TTreeReaderValue<std::vector<float>> x(reader, xname);
+    TTreeReaderValue<std::vector<float>> y(reader, yname);
+    TTreeReaderValue<std::vector<float>> z(reader, zname);
     reader.Next();
 
     //check if branches are there
@@ -78,7 +97,7 @@ std::vector<Hit_org::Hit> create_hit_vec(char const *filename, char const *treen
     return hit_vec;
 }
 
-void create_targ_root(char const *filename){
+void Hit_org::create_targ_root(char const *filename){
     //type set macros so they can be used in functions
     constexpr float n = NUMB_TARGS;
     constexpr float rho_max = RHO_MAX;
@@ -97,6 +116,7 @@ void create_targ_root(char const *filename){
 
     //create vectors with random variables
     std::vector<float> x_vec; std::vector<float> y_vec; std::vector<float> z_vec;
+    
     float targ_rho; float targ_phi;
     for(int i = 0; i < n; i++){
         targ_rho = rho_dist(engine);
@@ -110,22 +130,62 @@ void create_targ_root(char const *filename){
     //open root file and write vectors in TTree format
     TFile ResultsFile(filename,"RECREATE");
     TTree ResultsTree("TargetHits", "Search for target hits with runtime efficiencies");
-    ResultsTree.Branch("hit_x", &x_vec); 
-    ResultsTree.Branch("hit_y", &y_vec); 
-    ResultsTree.Branch("hit_z", &z_vec);
+    ResultsTree.Branch("targ_x", &x_vec); 
+    ResultsTree.Branch("targ_y", &y_vec); 
+    ResultsTree.Branch("targ_z", &z_vec);
     ResultsTree.Fill();
     ResultsTree.Write();
     ResultsFile.Close();
 }
 
-int main(){
+void Hit_org::full_search_mc(std::vector<Hit_org::Hit> targ_vec, std::vector<Hit_org::Hit> hit_vec, const char *filename){
+    constexpr float n_targs = NUMB_TARGS;
+    std::vector<float> rt_vec;
+    std::vector<float> sel_x_vec; 
+    std::vector<float> sel_y_vec; 
+    std::vector<float> sel_z_vec;
 
-    //Create root file filled with random target hits (only needs to be called once)
-    create_targ_root("files/VectorRuntime.root");
+    // loop over every target hit
+    for(int i = 0; i<n_targs; i++){
+        //find closest hit and time function
+        auto t1 = std::chrono::high_resolution_clock::now();
+        auto sel_hit = find_closest_hit(targ_vec.at(i), hit_vec, hit_vec.size());
+        auto t2 = std::chrono::high_resolution_clock::now();
+        auto dur = std::chrono::duration<double, std::micro>(t2-t1);
+
+        //save data
+        sel_x_vec.push_back(sel_hit.x);
+        sel_y_vec.push_back(sel_hit.y);
+        sel_z_vec.push_back(sel_hit.z);
+        rt_vec.push_back(dur.count());
+    }
+
+    //write output to root file
+    TFile ResultsFile(filename, "UPDATE");
+    auto ResultsTree = ResultsFile.Get<TTree>("TargetHits");
+    auto rt_branch = ResultsTree->Branch("sel_rt", &rt_vec);
+    auto sel_x_branch = ResultsTree->Branch("sel_x", &sel_x_vec);
+    auto sel_y_branch = ResultsTree->Branch("sel_y", &sel_y_vec);
+    auto sel_z_branch = ResultsTree->Branch("sel_z", &sel_z_vec);
+    rt_branch -> Fill(); sel_x_branch -> Fill(); sel_y_branch -> Fill(); sel_z_branch -> Fill();
+    ResultsTree->Write("", TObject::kOverwrite);
+
+}
+
+int main(){
+    auto tot_t1 = std::chrono::high_resolution_clock::now();
     
-    //vector objects are allocated on heap
-    std::vector<Hit_org::Hit> hit_vec = create_hit_vec("files/ClusterHitSeedRoot.root", "HitInfo");
-    std::vector<Hit_org::Hit> targ_vec = create_hit_vec("files/VectorRuntime.root", "TargetHits");
+    //Create root file filled with random target hits (only needs to be called once to create file)
+    //Hit_org::create_targ_root("files/VectorRuntime.root");
     
+    //Read hits and target_hits into vectors
+    std::vector<Hit_org::Hit> hit_vec = Hit_org::create_hit_vec("files/ClusterHitSeedRoot.root", "HitInfo", "hit_x", "hit_y", "hit_z");
+    std::vector<Hit_org::Hit> targ_vec = Hit_org::create_hit_vec("files/VectorRuntime.root", "TargetHits", "targ_x", "targ_y", "targ_z");
+    Hit_org::full_search_mc(targ_vec, hit_vec, "files/VectorRuntime.root");
+
+    auto tot_t2 = std::chrono::high_resolution_clock::now();
+    auto tot_dur = std::chrono::duration<double, std::milli>(tot_t2-tot_t1);
+    std::cout << "Total runtime duration: \t" << tot_dur.count() << "ms" << std::endl;
+
     return 0;
 }

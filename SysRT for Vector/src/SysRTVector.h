@@ -26,5 +26,12 @@ namespace Hit_org{
 
     };
     
-    //std::vector<Hit_org::Hit> create_hit_vec(TFile *File);
+    //create root file with randomly generated target hits
+    void create_targ_root(char const *filename);
+
+    //load root file info into a vector of hits
+    std::vector<Hit_org::Hit> create_hit_vec(char const *filename, char const *treename, char const *xname, char const *yname, char const *zname);
+    
+    //do mc simulation of brute force method and save runtime results in root file
+    void full_search_mc(std::vector<Hit_org::Hit> targ_vec, std::vector<Hit_org::Hit> hit_vec, const char *filename);
 }
