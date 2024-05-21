@@ -10,9 +10,14 @@
 #include <random> //for random number generation, includes exclusively for generating targets
 #include <cmath> //for trig functions for generating root file,includes exclusively for generating targets
 #include <chrono> //for runtime evaluations
+#include <TGraphErrors.h>
+#include <TCanvas.h>
 
-//define number of target hits to be generated
-#define NUMB_TARGS 1000;
+#define NUMB_HIT_IT 15; //number of hit iterations (must be >0) 
+#define NUMB_TARGS 100; //number of randomly generated targets to search for (must be >0)
+//example: NUMB_HIT_IT=4 & NUMB_TARGS=100 & total hits in root file=50000
+//                   -> assess runtimes for 50000 hits, 40000 hits, 30000 hits, 20000 hits, 10000 hits
+//                   -> each time you assessT runtimes you test with 100 randomly generated hits
 
 //define range in which 
 #define RHO_MAX 1014;
@@ -35,12 +40,12 @@ float calc_dis(Hit_org::Hit hit1, Hit_org::Hit hit2){
     return std::pow(hit1.x-hit2.x, 2) + std::pow(hit1.y-hit2.y, 2) + std::pow(hit1.z-hit2.z, 2);
 }
 
-Hit_org::Hit find_closest_hit(Hit_org::Hit targ_hit, std::vector<Hit_org::Hit> hit_vec, const int numb_hits){
+Hit_org::Hit find_closest_hit(Hit_org::Hit targ_hit, std::vector<Hit_org::Hit> hit_vec, const int n_hits){
     //setup 
     Hit_org::Hit closest_hit(0, 0, 0);
     float min_dis = std::numeric_limits<float>::max();
 
-    for(int i = 0; i<numb_hits; i++){
+    for(int i = 0; i<n_hits; i++){
         auto cur_dis = calc_dis(hit_vec.at(i), targ_hit);
         if(cur_dis < min_dis){
             min_dis = cur_dis;
@@ -139,50 +144,101 @@ void Hit_org::create_targ_root(char const *filename){
 }
 
 void Hit_org::full_search_mc(std::vector<Hit_org::Hit> targ_vec, std::vector<Hit_org::Hit> hit_vec, const char *filename){
-    constexpr float n_targs = NUMB_TARGS;
-    std::vector<float> rt_vec;
-    std::vector<float> sel_x_vec; 
-    std::vector<float> sel_y_vec; 
-    std::vector<float> sel_z_vec;
-
-    // loop over every target hit
-    for(int i = 0; i<n_targs; i++){
-        //find closest hit and time function
-        auto t1 = std::chrono::high_resolution_clock::now();
-        auto sel_hit = find_closest_hit(targ_vec.at(i), hit_vec, hit_vec.size());
-        auto t2 = std::chrono::high_resolution_clock::now();
-        auto dur = std::chrono::duration<double, std::micro>(t2-t1);
-
-        //save data
-        sel_x_vec.push_back(sel_hit.x);
-        sel_y_vec.push_back(sel_hit.y);
-        sel_z_vec.push_back(sel_hit.z);
-        rt_vec.push_back(dur.count());
-    }
+    constexpr int n_targs = NUMB_TARGS;
+    constexpr int n_hit_it =  NUMB_HIT_IT;
+    const int total_hits = hit_vec.size();
+    int n_hits;
+    std::vector<float> rt_vec, sel_x_vec, sel_y_vec, sel_z_vec;
 
     //write output to root file
     TFile ResultsFile(filename, "UPDATE");
-    auto ResultsTree = ResultsFile.Get<TTree>("TargetHits");
+    auto ReadTree = ResultsFile.Get<TTree>("TargetHits");
+    ReadTree -> SetBranchStatus("targ_x",0); ReadTree -> SetBranchStatus("targ_y",0); ReadTree -> SetBranchStatus("targ_z",0);
+
+    TTree *ResultsTree = new TTree("MyResults", "Search for target hits with runtime efficiencies");
+    
+    auto n_hits_branch = ResultsTree->Branch("n_hits", &n_hits);
     auto rt_branch = ResultsTree->Branch("sel_rt", &rt_vec);
-    auto sel_x_branch = ResultsTree->Branch("sel_x", &sel_x_vec);
-    auto sel_y_branch = ResultsTree->Branch("sel_y", &sel_y_vec);
+    auto sel_x_branch = ResultsTree->Branch("sel_x", &sel_x_vec); 
+    auto sel_y_branch = ResultsTree->Branch("sel_y", &sel_y_vec); 
     auto sel_z_branch = ResultsTree->Branch("sel_z", &sel_z_vec);
-    rt_branch -> Fill(); sel_x_branch -> Fill(); sel_y_branch -> Fill(); sel_z_branch -> Fill();
+
+    // loop over every target hit
+    for(float j = 1; j<=n_hit_it; j++){
+
+        //determine number of hits to search through
+        n_hits =  total_hits * (j / n_hit_it);
+        
+        //search through hits for all targets
+        for(int i = 0; i<n_targs; i++){
+
+            //find closest hit and time function
+            auto t1 = std::chrono::high_resolution_clock::now();
+            auto sel_hit = find_closest_hit(targ_vec.at(i), hit_vec, n_hits);
+            auto t2 = std::chrono::high_resolution_clock::now();
+            auto dur = std::chrono::duration<double, std::micro>(t2-t1);
+
+            //save data in vector
+            sel_x_vec.push_back(sel_hit.x);
+            sel_y_vec.push_back(sel_hit.y);
+            sel_z_vec.push_back(sel_hit.z);
+            rt_vec.push_back(dur.count());
+        }
+
+        //ResultsTree -> Fill(); technically right, but annoying because gives a warning
+        ResultsTree -> Fill();
+        //n_hits_branch -> Fill(); rt_branch -> Fill(); sel_x_branch -> Fill(); sel_y_branch -> Fill(); sel_z_branch -> Fill();
+        std::cout << n_hits << " hits searched for " << n_targs << " targets" << std::endl;
+    }
+
     ResultsTree->Write("", TObject::kOverwrite);
+    //ResultsFile.Close();
 
 }
 
+void gen_rt_graph(){
+    TFile file("files/VectorRuntime.root", "UPDATE"); auto myTree = file.Get<TTree>("MyResults");
+    std::vector<float> *rt_vec = nullptr; int n_hits;
+    myTree -> SetBranchAddress("sel_rt", &rt_vec); myTree -> SetBranchAddress("n_hits", &n_hits);
+    
+    const int n = myTree -> GetEntries();
+    Double_t n_hits_arr[n]; Double_t avg_arr[n]; Double_t stdev_arr[n];
+
+    for(int i = 0; i<n; i++){
+        myTree -> GetEntry(i);
+        n_hits_arr[i] = i;
+        double sum = std::accumulate(rt_vec->begin(), rt_vec->end(), 0.0);
+        avg_arr[i] = sum / rt_vec->size();
+        double sq_sum = std::inner_product(rt_vec->begin(), rt_vec->end(), rt_vec->begin(), 0.0);
+        stdev_arr[i] = std::sqrt(sq_sum / rt_vec->size() - avg_arr[i] * avg_arr[i]);
+
+        std::cout << "Entry " << i <<": " << avg_arr[i] << "+/-" << stdev_arr[i] << std::endl;
+    }
+    
+    TGraphErrors gr(n, n_hits_arr, avg_arr, nullptr, stdev_arr);
+    gr.Write("Runtime Graph");
+    file.Close();
+}
+
 int main(){
+    //start timer
     auto tot_t1 = std::chrono::high_resolution_clock::now();
     
     //Create root file filled with random target hits (only needs to be called once to create file)
-    //Hit_org::create_targ_root("files/VectorRuntime.root");
+    Hit_org::create_targ_root("files/VectorRuntime.root");
     
     //Read hits and target_hits into vectors
     std::vector<Hit_org::Hit> hit_vec = Hit_org::create_hit_vec("files/ClusterHitSeedRoot.root", "HitInfo", "hit_x", "hit_y", "hit_z");
     std::vector<Hit_org::Hit> targ_vec = Hit_org::create_hit_vec("files/VectorRuntime.root", "TargetHits", "targ_x", "targ_y", "targ_z");
+    
+    //run search with varying number of hits and store in VectorRuntime.root
     Hit_org::full_search_mc(targ_vec, hit_vec, "files/VectorRuntime.root");
 
+    //generate graph from data stored in MyResults Tree
+    gen_rt_graph();
+    //TFile file("files/VectorRuntime.root", "UPDATE");
+
+    //report runtime of program
     auto tot_t2 = std::chrono::high_resolution_clock::now();
     auto tot_dur = std::chrono::duration<double, std::milli>(tot_t2-tot_t1);
     std::cout << "Total runtime duration: \t" << tot_dur.count() << "ms" << std::endl;

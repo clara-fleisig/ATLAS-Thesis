@@ -4,6 +4,17 @@
 #include <TTreeReader.h>
 #include <TTreeReaderValue.h>
 
+//define number of target hits to be generated
+#define NUMB_TARGS 100;
+
+//define range in which 
+#define RHO_MAX 1014;
+#define RHO_MIN 33;
+#define PHI_MAX 2*3.141593;
+#define PHI_MIN 0;
+#define Z_MAX 2860;
+#define Z_MIN -2860;
+
 namespace Hit_org{
     class Hit{
         public:
