@@ -1,0 +1,32 @@
+variables:   
+  ATLAS_LOCAL_ROOT_BASE: /cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase 
+  RE_PATTERN: '/Draft:|\[Draft\]|\(Draft\)/'
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SSL_NO_VERIFY: "true"
+  TAG_FOR_IMAGE: $CI_COMMIT_REF_NAME
+  ANALYSISBASE_IMAGE: gitlab-registry.cern.ch/atlas/athena/analysisbase:24.2.30
+
+stages:   
+  - build 
+cmake_asg_compile:
+  stage: build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - when: on_success
+  artifacts:
+    expire_in: 1d
+    #untracked: true
+    paths:
+    - build
+    - source
+  image: $ANALYSISBASE_IMAGE
+  before_script: 
+    - source /home/atlas/release_setup.sh
+  script:
+    - mkdir source 
+    - ls | grep -v source | xargs -i mv {} source/
+    - mkdir build
+    - cd build
+    - cmake ../source
+    - make -j4
+

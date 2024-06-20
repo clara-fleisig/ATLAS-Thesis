@@ -1,0 +1,17 @@
+identifier	time_total_s	time_perevent_s
+Reader:EventGenerator	0.6149	0.6149
+Writer:RootParticleWriter	0.04975	0.04975
+Algorithm:ParticleSelector	0.003224	0.003224
+Algorithm:FatrasSimulation	3.282	3.282
+Writer:RootParticleWriter	0.01032	0.01032
+Writer:RootParticleWriter	0.01149	0.01149
+Writer:RootSimHitWriter	0.1932	0.1932
+Algorithm:DigitizationAlgorithm	0.1658	0.1658
+Writer:RootMeasurementWriter	0.2973	0.2973
+Algorithm:TruthSeedSelector	0.0115	0.0115
+Algorithm:SpacePointMaker	0.04062	0.04062
+Algorithm:SeedingAlgorithm	0.3311	0.3311
+Algorithm:TrackParamsEstimationAlgorithm	0.0168	0.0168
+Algorithm:TrajectoriesToPrototracks	0.001392	0.001392
+Writer:SeedingPerformanceWriter	0.008738	0.008738
+Writer:RootTrackParameterWriter	0.06965	0.06965

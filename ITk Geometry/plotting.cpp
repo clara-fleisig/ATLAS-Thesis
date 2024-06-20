@@ -1,3 +1,6 @@
+//hitInfoTree->Draw("hit_x:hit_moduleID", c1&&c2)
+//c2 = "hit_volumeID==8"
+
 void colormap_2d(const char *x_str, const char *y_str, const char *col_str){
     //load in filename and tree
     std::unique_ptr<TFile> myFile(TFile::Open("ClusterHitSeedRoot.root"));
@@ -82,7 +85,7 @@ void graph_2d(const char *x_str, const char *y_str)
     hitInfoTree -> GetEntry(0);
     
     //determine length of branches
-    uint const n = x -> size();
+    const uint n = x -> size();
 
     //setup graph on canvas
     auto c = new TCanvas();
@@ -162,13 +165,8 @@ void mg_cut_graph_2d(const int lb, const int ub, TMultiGraph *mg, const char *x_
     mg -> Add(gr, "AP");
 }
 
-
 void my_func(){
    // setup
-    std::unique_ptr<TFile> myFile(TFile::Open("ClusterHitSeedRoot.root"));
-    auto hitInfoTree = myFile->Get<TTree>("HitInfo");
-    auto c = new TCanvas("c","Graph2D example",0,0,700,600);
-
     vector<float> *x = nullptr;
     vector<float> *y = nullptr;
     vector<float> *z = nullptr;
@@ -176,6 +174,8 @@ void my_func(){
     vector<float> *moduleID = nullptr;
     vector<float> *volumeID = nullptr;
     vector<float> *layerID = nullptr;
+    vector<float> *etaModule = nullptr;
+    vector<float> *phiModule = nullptr;
     hitInfoTree -> SetBranchAddress("hit_x", &x);
     hitInfoTree -> SetBranchAddress("hit_y", &y);
     hitInfoTree -> SetBranchAddress("hit_z", &z);
@@ -183,10 +183,15 @@ void my_func(){
     hitInfoTree -> SetBranchAddress("hit_moduleID", &moduleID);
     hitInfoTree -> SetBranchAddress("hit_volumeID", &volumeID);
     hitInfoTree -> SetBranchAddress("hit_layerID", &layerID);
+    hitInfoTree -> SetBranchAddress("hit_etaModule", &etaModule);
+    hitInfoTree -> SetBranchAddress("hit_phiModule", &phiModule);
     hitInfoTree -> GetEntry(0);
     uint const n = x -> size();
 
     std::unique_ptr<TFile> myFile(TFile::Open("ClusterHitSeedRoot.root"));
     auto hitInfoTree = myFile->Get<TTree>("HitInfo");
-    hitInfoTree->Draw("hit_x:hit_y:hit_z:hit_moduleID","","COLZ")
+    auto c = new TCanvas("c","Graph2D example",0,0,700,600);
+    
+    //gr->SetTitle(title);
+    //hitInfoTree->Draw("hit_x:hit_y:hit_z:hit_moduleID","","COLZ");
 }

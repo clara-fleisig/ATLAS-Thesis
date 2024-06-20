@@ -11,7 +11,7 @@
 #include <cmath> //for trig functions for generating root file,includes exclusively for generating targets
 #include <chrono> //for runtime evaluations
 #include <TGraphErrors.h>
-#include <TCanvas.h>
+#include <TAxis.h>
 
 #define NUMB_HIT_IT 15; //number of hit iterations (must be >0) 
 #define NUMB_TARGS 100; //number of randomly generated targets to search for (must be >0)
@@ -19,7 +19,7 @@
 //                   -> assess runtimes for 50000 hits, 40000 hits, 30000 hits, 20000 hits, 10000 hits
 //                   -> each time you assessT runtimes you test with 100 randomly generated hits
 
-//define range in which 
+//define range in which target hits should be generated
 #define RHO_MAX 1014;
 #define RHO_MIN 33;
 #define PHI_MAX 2*3.141593;
@@ -27,6 +27,7 @@
 #define Z_MAX 2860;
 #define Z_MIN -2860;
 
+#pragma optimize( "", off )
 bool CheckValue(ROOT::Internal::TTreeReaderValueBase& value) {
    if (value.GetSetupStatus() < 0) {
       std::cerr << "Error " << value.GetSetupStatus()
@@ -41,12 +42,16 @@ float calc_dis(Hit_org::Hit hit1, Hit_org::Hit hit2){
 }
 
 Hit_org::Hit find_closest_hit(Hit_org::Hit targ_hit, std::vector<Hit_org::Hit> hit_vec, const int n_hits){
-    //setup 
+    //initialize closest_hit object and min_dis variabale, where min_dis is currently the largest possible distance
     Hit_org::Hit closest_hit(0, 0, 0);
     float min_dis = std::numeric_limits<float>::max();
 
-    for(int i = 0; i<n_hits; i++){
+    //itterate through each ATHENA hit (stored in hit_vec)
+    for(int i = n_hits; i>n_hits; i++){
+        //calculate distance between target hit and current ATHENA hit of interest
         auto cur_dis = calc_dis(hit_vec.at(i), targ_hit);
+
+        //replace min_dis and closest_hit with values from current ATHENA hit if ATHENA hit is closer than stored values
         if(cur_dis < min_dis){
             min_dis = cur_dis;
             closest_hit = hit_vec.at(i);
@@ -164,10 +169,11 @@ void Hit_org::full_search_mc(std::vector<Hit_org::Hit> targ_vec, std::vector<Hit
     auto sel_z_branch = ResultsTree->Branch("sel_z", &sel_z_vec);
 
     // loop over every target hit
-    for(float j = 1; j<=n_hit_it; j++){
+    for(float j = 0; j<=n_hit_it; j++){
 
         //determine number of hits to search through
         n_hits =  total_hits * (j / n_hit_it);
+        //sel_x_vec.clear(); sel_y_vec.clear(); sel_z_vec.clear();
         
         //search through hits for all targets
         for(int i = 0; i<n_targs; i++){
@@ -176,7 +182,7 @@ void Hit_org::full_search_mc(std::vector<Hit_org::Hit> targ_vec, std::vector<Hit
             auto t1 = std::chrono::high_resolution_clock::now();
             auto sel_hit = find_closest_hit(targ_vec.at(i), hit_vec, n_hits);
             auto t2 = std::chrono::high_resolution_clock::now();
-            auto dur = std::chrono::duration<double, std::micro>(t2-t1);
+            auto dur = std::chrono::duration<double, std::milli>(t2-t1);
 
             //save data in vector
             sel_x_vec.push_back(sel_hit.x);
@@ -197,6 +203,7 @@ void Hit_org::full_search_mc(std::vector<Hit_org::Hit> targ_vec, std::vector<Hit
 }
 
 void gen_rt_graph(){
+    std::cout << "Generating Runtime Graph..." << std::endl;
     TFile file("files/VectorRuntime.root", "UPDATE"); auto myTree = file.Get<TTree>("MyResults");
     std::vector<float> *rt_vec = nullptr; int n_hits;
     myTree -> SetBranchAddress("sel_rt", &rt_vec); myTree -> SetBranchAddress("n_hits", &n_hits);
@@ -206,16 +213,43 @@ void gen_rt_graph(){
 
     for(int i = 0; i<n; i++){
         myTree -> GetEntry(i);
-        n_hits_arr[i] = i;
+        n_hits_arr[i] = n_hits / 1000;
         double sum = std::accumulate(rt_vec->begin(), rt_vec->end(), 0.0);
         avg_arr[i] = sum / rt_vec->size();
         double sq_sum = std::inner_product(rt_vec->begin(), rt_vec->end(), rt_vec->begin(), 0.0);
         stdev_arr[i] = std::sqrt(sq_sum / rt_vec->size() - avg_arr[i] * avg_arr[i]);
-
-        std::cout << "Entry " << i <<": " << avg_arr[i] << "+/-" << stdev_arr[i] << std::endl;
     }
     
     TGraphErrors gr(n, n_hits_arr, avg_arr, nullptr, stdev_arr);
+    gr.SetTitle("Runtime Scaling");
+    gr.GetXaxis()->SetTitle("Number of kHits");
+    gr.GetYaxis()->SetTitle("Average Runtime (ms)");
+    gr.Write("Runtime Graph");
+    file.Close();
+}
+
+void gen_rt_graph(){
+    std::cout << "Generating Runtime Graph..." << std::endl;
+    TFile file("files/VectorRuntime.root", "UPDATE"); auto myTree = file.Get<TTree>("MyResults");
+    std::vector<float> *rt_vec = nullptr; int n_hits;
+    myTree -> SetBranchAddress("sel_rt", &rt_vec); myTree -> SetBranchAddress("n_hits", &n_hits);
+    
+    const int n = myTree -> GetEntries();
+    Double_t n_hits_arr[n]; Double_t avg_arr[n]; Double_t stdev_arr[n];
+
+    for(int i = 0; i<n; i++){
+        myTree -> GetEntry(i);
+        n_hits_arr[i] = n_hits / 1000;
+        double sum = std::accumulate(rt_vec->begin(), rt_vec->end(), 0.0);
+        avg_arr[i] = sum / rt_vec->size();
+        double sq_sum = std::inner_product(rt_vec->begin(), rt_vec->end(), rt_vec->begin(), 0.0);
+        stdev_arr[i] = std::sqrt(sq_sum / rt_vec->size() - avg_arr[i] * avg_arr[i]);
+    }
+    
+    TGraphErrors gr(n, n_hits_arr, avg_arr, nullptr, stdev_arr);
+    gr.SetTitle("Runtime Scaling");
+    gr.GetXaxis()->SetTitle("Number of kHits");
+    gr.GetYaxis()->SetTitle("Average Runtime (ms)");
     gr.Write("Runtime Graph");
     file.Close();
 }
@@ -236,7 +270,6 @@ int main(){
 
     //generate graph from data stored in MyResults Tree
     gen_rt_graph();
-    //TFile file("files/VectorRuntime.root", "UPDATE");
 
     //report runtime of program
     auto tot_t2 = std::chrono::high_resolution_clock::now();
@@ -245,3 +278,4 @@ int main(){
 
     return 0;
 }
+#pragma optimize( "", on )

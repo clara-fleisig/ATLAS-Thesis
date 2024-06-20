@@ -1,0 +1,9 @@
+Plotting scripts should take constructed tracks as input
+they should not have to re-run the tracking to make plots
+
+plotTrack && plotTracksOverDetector should be combined into one script and operate on such input
+
+processForPickleITK may or may not be necessary moving forward. We will need to save output tracks,
+but they do not need to be formatted for pickling
+
+Haider: I would like the logic for evalEtrapTree to be factorize out into a class not this utils

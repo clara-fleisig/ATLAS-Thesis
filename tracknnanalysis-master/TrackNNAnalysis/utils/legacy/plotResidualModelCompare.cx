@@ -1,0 +1,192 @@
+// #include <stdio.h>
+#include <stddef.h>
+#include <TFile.h>
+#include <TH1F.h>
+#include <TH1D.h>
+#include <TTree.h>
+#include <TCanvas.h>
+#include <TColor.h>
+#include <THStack.h>
+#include <TLegend.h>
+#include <TChain.h>
+#include <fstream>
+#include <vector>
+#include <TPad.h>
+#include <TGraphAsymmErrors.h>
+#include <TMath.h>
+
+#include "TrackNNAnalysis/atlasstyle/AtlasStyle.h"
+#include "TrackNNAnalysis/atlasstyle/AtlasLabels.h"
+
+using namespace std;
+
+
+vector<TColor*> getcolours();
+void plotHisto(TString histName);
+
+int main()
+{
+    SetAtlasStyle();
+    getcolours();
+
+
+    plotHisto("residuals_phi");
+    plotHisto("residuals_rho");
+    plotHisto("residuals_z");
+    
+}
+
+void plotHisto(TString histName)
+{
+    auto f_biRNN = TFile::Open("PredError_ACTS_ttbarWithOverlay_mu200_biRNN_ws3.root");
+    auto f_RNN   = TFile::Open("PredError_ACTS_ttbarWithOverlay_mu200_RNN_ws3.root");
+    auto f_MLP   = TFile::Open("PredError_ACTS_ttbarWithOverlay_mu200_MLP_ws3.root");
+    auto f_ESN   = TFile::Open("PredError_ACTS_ttbarWithOverlay_mu200_ESN_ws3.root");
+
+    auto h_biRNN = (TH1F*) f_biRNN->Get("fullDetector/" + histName);
+    h_biRNN->SetDirectory(0);
+    auto h_RNN   = (TH1F*) f_RNN->Get("fullDetector/" + histName);
+    h_RNN->SetDirectory(0);
+    auto h_MLP   = (TH1F*) f_MLP->Get("fullDetector/" + histName);
+    h_MLP->SetDirectory(0);
+    auto h_ESN   = (TH1F*) f_ESN->Get("fullDetector/" + histName);
+    h_ESN->SetDirectory(0);
+
+
+
+    map<TString, TH1F*> hist;
+    hist["biRNN"] = h_biRNN;
+    hist["RNN"] = h_RNN;
+    hist["MLP"] = h_MLP;
+    hist["ESN"] = h_ESN;
+
+    int count = 0;
+    Double_t maxN = -1;
+
+    TLegend *elLeg =  new TLegend (0.20, 0.78, 0.90, 0.925);
+    elLeg->SetFillColor(0);
+    elLeg->SetBorderSize(0);
+    elLeg->SetTextFont(42);
+    elLeg->SetTextSize(0.03);
+    elLeg->SetNColumns (2);
+    elLeg->SetColumnSeparation (2 * elLeg->GetColumnSeparation() );
+
+    std::vector<TString> keys = {"biRNN", "RNN", "MLP", "ESN"};
+    for(auto& k: keys)
+    {
+        auto h = hist[k];
+        
+        h->Scale(1.0/h->Integral());
+        h->SetLineColor(1756 + count);
+        h->SetLineWidth(2);
+        h->SetLineWidth(2);
+
+        double maxT = h->GetMaximum();
+        if(maxT > maxN) maxN = maxT;
+
+        count++;
+        TString name = k;
+        TString mean = "";
+        TString stdDev = "";
+        if(histName.Contains("phi"))
+        {
+            stdDev.Form("%.3f",h->GetStdDev());
+            mean.Form("%.3f",h->GetMean());
+        }
+        else
+        {
+            stdDev.Form("%.1f",h->GetStdDev());
+            mean.Form("%.1f",h->GetMean());
+        }
+        name += " #sigma=" + stdDev + ", #mu= " + mean;
+
+        elLeg->AddEntry(h, name, "l");
+    }
+
+
+
+    TH1F* frame = (TH1F*) h_biRNN->Clone("frame");
+    frame->Reset();
+    frame->SetMaximum(maxN*1.3);
+    frame->GetXaxis()->SetNdivisions(505);
+    frame->GetYaxis()->SetTitle("A.U.");
+
+    if(histName.Contains("phi"))
+    {
+        frame->GetXaxis()->SetTitle("#phi_{true} - #phi_{pred} (rad)");
+        frame->GetXaxis()->SetRangeUser(-.1,.1);
+    }
+    if(histName.Contains("z"))  
+    {
+        frame->GetXaxis()->SetTitle("z_{true} - z_{pred} (mm)");
+        frame->GetXaxis()->SetRangeUser(-30,30);
+    }
+    if(histName.Contains("rho"))
+    {
+        frame->GetXaxis()->SetTitle("#rho_{true} - #rho_{pred} (mm)");
+        frame->GetXaxis()->SetRangeUser(-30,30);
+    }
+
+
+    TCanvas* c1 = new TCanvas("c1", "c1", 0, 0, 600, 600);
+    frame->Draw();
+    for(auto& h: hist)
+    {
+        h.second->Draw("histSAME");
+    }
+    elLeg->Draw();
+
+    c1->SaveAs(histName  + ".eps");
+    c1->SaveAs(histName  + ".C");
+
+}
+
+vector<TColor*> getcolours()
+{
+
+    std::vector<TColor*> colours;
+    int ci = 1756; // color index
+    new TColor(ci, 62/255.,    153/255.,    247/255.); //54
+    ci++;
+
+    new TColor(ci, 0.8500,    0.3250,    0.0980); //57
+    ci++;          
+    new TColor(ci, 0.4940,    0.1840,    0.5560); //58
+    ci++;
+    //new TColor(ci, 0.9290,    0.6940,    0.1250); //59
+    //ci++; 
+    new TColor(ci, 0.4660,    0.6740,    0.1880); //60
+    ci++;
+    
+    //new TColor(ci, 0.9290,    0.6940,    0.1250);
+    //ci++;
+    new TColor(ci, 255.0/255 , 77.0/255 , 244.0/255);
+    ci++;
+    new TColor(ci, 0.4660,    0.6740,    0.1880);
+    ci++;
+    new TColor(ci, 0.3010,    0.7450,    0.9330);
+    ci++;
+    new TColor(ci, 0.4010,    0.6450,    0.8330);
+    ci++;
+    new TColor(ci, 0.1010,    0.12450,   0.3330);
+    ci++;
+    new TColor(ci, 0.6350,    0.0780,    0.1840); //62
+    ci++;
+    new TColor(ci, 142.0/255 , 0.0/255 , 62.0/255);
+    ci++;
+    new TColor(ci, 96.0/255 , 78.0/255 , 0.0/255);
+    ci++;
+    new TColor(ci, 92.0/255 , 174.0/255 , 0.0/255);
+    ci++;
+    new TColor(ci, 1.0/255 , 237.0/255 , 171.0/255);
+    ci++;
+    new TColor(ci, 50.0/255 , 134.0/255 , 255.0/255);
+    ci++;
+    new TColor(ci, 112.0/255 , 0.0/255 , 88.0/255);
+    ci++;
+    new TColor(ci, 28.0/255 , 0.0/255 , 19.0/255);
+    ci++;
+    new TColor(ci, 255.0/255 , 102.0/255 , 165.0/255);
+    ci++;
+    return colours;
+}

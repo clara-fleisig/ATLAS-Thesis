@@ -1,0 +1,38 @@
+\section{Preventing Compiler Optimizations}
+\label{sec:Preventing Compiler Optimizations}
+
+\subsection{Motivation}
+As mentioned in \ref{}, data stored in ROOT files were used to test potential solutions. These files are a proxy for a live incoming data stream which would exist if the solution were implemented. 
+
+A potential complication is that a C++ compiler may perform optimizations during compilation that rely on data at specific addresses already being known. For example, if identical solutions was tested twice with the same hits in a compiled program, the solution may perform better on the second test. This is because the values at specific addresses may already be known and stored on the stack from when the first test was executed, whereas the first test needed to retrieve those same values from the heap. It is convenient to be able to test the same solution multiple times within a single program for evaluating how the solution’s performance scales with the size of data, Monte Carlo simulations, and testing multiple solutions in the same program. Thus, this chapter outlines a strategy for avoiding undesirable compiler optimizations. In particular, how to test a program that tests runtime scaling with the number of ATHENA hits, and performs Monte Carlo simulations without encountering unwanted compiler optimizations.
+
+\subsection{Setup}
+To test compiler behaviour I implemented a simple program intended to search for randomly generated hits. To prepare for tests the program performed the following: 
+\begin{enumerate}
+    \item Create a ROOT file which contains vectors of random target hits. These hits are samples of a uniform distribution of $z$, $\rho$ and $\phi$ covering the range of the entire ItK detector.
+    \item Read target hits from ROOT file from generated in the previous step into a vector of Hit objects. Each hit object stores the x-coordinate, y-coordinate and z-coordinate of the target hit.
+    \item Read ATHENA hits from ROOT file into a vector of Hit objects like the ones used for the target hits.
+\end{enumerate}
+
+ The search algorithm's goal was to find the closest ATHENA hit for a given target hit, see Listing \ref{Lis:Test algo} for the implementation code.
+
+\begin{lstlisting}[language=C++, , caption=Test Search Algorithm, label=Lis:Test algo]
+    Hit_org::Hit closest_hit(0, 0, 0);
+    float min_dis = std::numeric_limits<float>::max();
+
+    for(int i = n_hits; i>n_hits; i++){
+        auto cur_dis = calc_dis(hit_vec.at(i), targ_hit);
+        if(cur_dis < min_dis){
+            min_dis = cur_dis;
+            closest_hit = hit_vec.at(i);
+        }
+    }
+\end{lstlisting}
+
+This code calculates the euclidean distance between the target hit and the first $n\_hits$ stored in $hit\_vec$, where $hit\_vec$ stores ATHENA hits. If the newly calculated euclidean distance is less than the current value in $min\_dis$, the current value of $min\_dis$ is replaced by the newly calculated value. $closest\_hit$ is also correspondingly updated. Since this algorithm needs to read the value of every ATHENA hit, it is predicted to have an of $O(n)$ runtime efficiency, where $n$ is the number of ATHENA hits searched ($n\_hits$).
+
+First, the simple but naive approach to test the scaling of runtime efficiencies was investigated. This approach is to reuse the same vector of target hits and ATHENA hits every time the algorithm's runtime is evaluated. To test the scaling of the algorithms runtime, the number of hits searched ($n\_hits$) was varied.
+
+\subsection{Results}
+\subsubsection{Reusing the Target and ATHENA Hit Vectors}
+ 

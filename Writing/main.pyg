@@ -1,0 +1,14 @@
+    //initialize closest_hit object and min_dis variabale, where min_dis is currently the largest possible distance
+    Hit_org::Hit closest_hit(0, 0, 0);
+    float min_dis = std::numeric_limits<float>::max();
+
+    //itterate through each ATHENA hit (stored in hit_vec)
+    for(int i = n_hits; i>n_hits; i++){
+        //calculate distance between target hit and current ATHENA hit of interest
+        auto cur_dis = calc_dis(hit_vec.at(i), targ_hit);
+
+        //replace min_dis and closest_hit with values from current ATHENA hit if ATHENA hit is closer than stored values
+        if(cur_dis < min_dis){
+            min_dis = cur_dis;
+            closest_hit = hit_vec.at(i);
+        }

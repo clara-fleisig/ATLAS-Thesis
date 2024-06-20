@@ -1,0 +1,19 @@
+{
+    "detectorGeoFile" : "../source/TrackNNAnalysis/data/DetectorGeo/DetectorGeo_ACTS_ITK.root",
+
+    "NNPredictorOnnxFile" : "../source/TrackNNAnalysis/data/ExtrapolationModelsITK/Extrap_MLP_ITK_ws3_v3.onnx",
+    "NNVolumeSize" : 15,
+    "NNLayerSize" : 30,
+
+    "NNClassifierOnnxFile" : "../source/TrackNNAnalysis/data/ClassificationModelsITK/Classification_MLP_ITK_ws3_v3.onnx",
+    "NNClassifierHitLength" : 10,
+
+    "LayerRegion" : "custom",
+
+    "uncertainty" : 25,
+    "windowSize" : 3 ,
+    "batchSize" : 100,
+    "maxBranches" : 6,
+    "minHits": 6,
+    "deltaROverlap": 0
+}

@@ -1,0 +1,22 @@
+DNN_vHTTFakes.onnx - 
+Trained with HTT fakes with truth prob < 0.7 && ttbar reco
+Without Z slicing, so crazy amount of fakes
+7/8 hits per track
+
+
+
+DNN_Zsliced.onnx - 
+Same as above, but trained with Z slicing
+
+
+V1 - These are the first large scale ONNX model - Trained with multiple different flavours with truth/offline/HTT track combination with ttbar or without ttbar
+Forced meant that all epochs were forced and no early stopping
+Default model "TrackNNAnalysis/ONNXModels/v1/DNN_HTTfakes_SingleP_RecoTruth_v1.onnx"
+
+V2 - Same as above, but few difference
+- A mistake on the HTT layering was found. V1 using the outer side of the first strip later. V2 fixes this and correctly uses the inner side of the first stip layer
+- ttbar tracks are limited to eta > 0.1 and eta < 0.3
+
+
+V3 - First try for other region
+v2 networks copied over for ease of use
