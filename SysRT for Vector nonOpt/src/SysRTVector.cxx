@@ -267,7 +267,6 @@ void Hit_org::full_search_mc(const char *file_name) {
 
         // Fill the results tree
         ResultsTree->Fill();
-        n_hits_branch->Fill(); rt_branch->Fill(); sel_x_branch->Fill(); sel_y_branch->Fill(); sel_z_branch->Fill();
         std::cout << n_hits << " hits searched for " << n_targs << " targets" << std::endl;
     }
 
